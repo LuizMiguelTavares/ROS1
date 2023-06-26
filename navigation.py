@@ -5,6 +5,7 @@ import tf.transformations as tf
 from geometry_msgs.msg import Twist, PoseStamped
 from nav_msgs.msg import Odometry
 from std_msgs.msg import Bool
+from obstacle_avoidance.obstacle_avoidance import ObstacleAvoidance
 from math import cos, sin, pi
 import numpy as np
 import time
@@ -37,12 +38,6 @@ class PioneerController:
             Bool,
             self.emergency_button_callback,
             queue_size=10)
-        
-        self.subscription = rospy.Subscriber(
-            'potential',
-            Twist,
-            self.obstacle_avoidance_callback,
-            queue_size=10)
 
         self.timer = rospy.Timer(rospy.Duration(1/30), self.control_loop)
 
@@ -69,7 +64,16 @@ class PioneerController:
         self.path_angular_z = 0.0
         
         #### OBSTACULO
-        self.obstacle_avoidance = None
+        self.obstacle_avoidance = True
+        self.robot_heigth = 0.5
+        self.robot_width = 0.5
+        self.obs_avoidance = ObstacleAvoidance(n=4, a=0.7, b=0.7, k=1)
+        x_obs = 0.0
+        y_obs = 5.0
+        yaw_obs = 70
+        height_obs = 0.3
+        width_obs  = 0.7
+        self.obstacle_pose = [x_obs, y_obs, yaw_obs, height_obs, width_obs]
 
     def RobotPose(self, msg):
         # Process the pose data
@@ -84,9 +88,6 @@ class PioneerController:
         self.robot_roll, self.robot_pitch, self.robot_yaw = tf.euler_from_quaternion(
             [orientation.x, orientation.y, orientation.z, orientation.w]
         )
-        
-         
-        
 
         if self.prev_pose is not None and self.prev_time is not None:
             current_time = time.time()
@@ -198,12 +199,6 @@ class PioneerController:
                 self.publisher.publish(stop_cmd)
 
             rospy.signal_shutdown("Emergency stop")
-    
-    def obstacle_avoidance_callback(self, ob_avoidance):
-        self.obstacle_avoidance = ob_avoidance
-        
-        self.x_dot_avoidance = ob_avoidance.linear.x
-        self.y_dot_avoidance = ob_avoidance.linear.y
 
     def controller(self):
         Kp = np.array([[self.pgains[0], 0],
@@ -211,14 +206,13 @@ class PioneerController:
 
         K = np.array([[np.cos(self.robot_yaw), -self.a*np.sin(self.robot_yaw)],
                       [np.sin(self.robot_yaw), self.a*np.cos(self.robot_yaw)]])
-                      
-        #K = np.array([[1, 0], 
-        #             [0, 1]])
 
         Xtil = np.array([self.path_x - self.robot_x, self.path_y - self.robot_y])
         
         if self.obstacle_avoidance is not None:
-            desired_velocity = np.array([self.path_linear_x + self.x_dot_avoidance, self.path_linear_y + self.y_dot_avoidance])
+            robot_pose = [self.robot_x, self.robot_y, self.robot_yaw, self.robot_heigth, self.robot_width ]
+            x_dot, y_dot = self.obs_avoidance.obstacle_avoidance(robot_pose, self.obstacle_pose)
+            desired_velocity = np.array([self.path_linear_x + x_dot, self.path_linear_y + y_dot])
             rospy.loginfo(str(self.x_dot_avoidance))
         else:
             desired_velocity = np.array([self.path_linear_x, self.path_linear_y])
