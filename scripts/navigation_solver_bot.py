@@ -184,23 +184,7 @@ class PioneerController:
 
 
     def control_loop(self, event):
-        if self.prev_pose is None:
-            return
-
-        desired_linear_velocity, desired_angular_velocity = self.controller()
-
-        #rospy.loginfo('Linear Velocity: ' + str(desired_linear_velocity) + ', Angular Velocity: ' + str(desired_angular_velocity))
-
-        ctrl_msg = Twist()
-        ctrl_msg.linear.x = desired_linear_velocity
-        ctrl_msg.linear.y = 0.0
-        ctrl_msg.linear.z = 0.0
-        ctrl_msg.angular.x = 0.0
-        ctrl_msg.angular.y = 0.0
-        ctrl_msg.angular.z = desired_angular_velocity
-        # Publish the Twist message to control the robot
-        self.publisher.publish(ctrl_msg)
-
+        
         if self.btn_emergencia:
             rospy.loginfo('Robot stopping by Emergency')
             rospy.loginfo('Sending emergency stop command')
@@ -217,6 +201,23 @@ class PioneerController:
                 self.publisher.publish(stop_cmd)
 
             rospy.signal_shutdown("Emergency stop")
+
+        if self.prev_pose is None:
+            return
+
+        desired_linear_velocity, desired_angular_velocity = self.controller()
+
+        #rospy.loginfo('Linear Velocity: ' + str(desired_linear_velocity) + ', Angular Velocity: ' + str(desired_angular_velocity))
+
+        ctrl_msg = Twist()
+        ctrl_msg.linear.x = desired_linear_velocity
+        ctrl_msg.linear.y = 0.0
+        ctrl_msg.linear.z = 0.0
+        ctrl_msg.angular.x = 0.0
+        ctrl_msg.angular.y = 0.0
+        ctrl_msg.angular.z = desired_angular_velocity
+        # Publish the Twist message to control the robot
+        self.publisher.publish(ctrl_msg)
 
     def controller(self):
         Kp = np.array([[self.pgains[0], 0],

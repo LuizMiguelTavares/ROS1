@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import os
 import sys
 from PyQt5.QtWidgets import QApplication, QWidget, QPushButton

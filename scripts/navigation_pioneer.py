@@ -26,6 +26,12 @@ class PioneerController:
             PoseStamped,
             self.RobotPose,
             queue_size=40)
+        
+        self.pose_subscriber = rospy.Subscriber(
+            "/vrpn_client_node/OBJ/pose",
+            PoseStamped,
+            self.obstacle_pose,
+            queue_size=40)
 
         self.subscription = rospy.Subscriber(
             'path_pose',
@@ -82,17 +88,12 @@ class PioneerController:
 
         # Obstacle
         self.obstacle = False # Sets if the obstacle counts
-        x_obs = 0.0
-        y_obs = 5.0
-        yaw_obs = 70
-        height_obs = 0.3
-        width_obs  = 0.7
-        self.obstacle_pose = [x_obs, y_obs, yaw_obs, height_obs, width_obs]
+        
+        self.obs_height = 0.3/2
+        self.obs_width  = 0.3/2
 
         # Starting Obstacle Avoidance Class
         self.obs_avoidance = ObstacleAvoidance(n=4, a=0.7, b=0.7, k=1)
-
-        rospy.loginfo('SolverBot navigation node started')
 
         rospy.loginfo('Pioneer navigation node started')
 
@@ -129,6 +130,27 @@ class PioneerController:
 
         self.prev_pose = msg.pose
         self.prev_time = time.time()
+    
+    
+    def obstacle_pose(self, msg):
+    
+        self.obstacle = True
+        
+        # Process the pose data
+        pose = msg.pose
+
+        # Process the pose data
+        obstacle_x = pose.position.x
+        obstacle_y = pose.position.y
+        obstacle_z = pose.position.z
+
+        orientation = pose.orientation
+        obstacle_roll, obstacle_pitch, obstacle_yaw = tf.euler_from_quaternion(
+            [orientation.x, orientation.y, orientation.z, orientation.w]
+        )
+        
+        self.obstacle_pose = [obstacle_x, obstacle_y, obstacle_yaw, self.obs_height, self.obs_width]
+
 
     def calculate_euler_diff(self, current_orientation, previous_orientation):
         # Convert the quaternion objects to lists
@@ -216,6 +238,24 @@ class PioneerController:
             self.btn_emergencia = True
 
     def control_loop(self, event):
+    
+        if self.btn_emergencia:
+            rospy.loginfo('Robot stopping by Emergency')
+            rospy.loginfo('Sending emergency stop command')
+
+            for _ in range(10):
+                stop_cmd = Twist()
+                stop_cmd.linear.x = 0.0
+                stop_cmd.linear.y = 0.0
+                stop_cmd.linear.z = 0.0
+                stop_cmd.angular.x = 0.0
+                stop_cmd.angular.y = 0.0
+                stop_cmd.angular.z = 0.0
+                # Publish the Twist message to stop the robot
+                self.publisher.publish(stop_cmd)
+
+            rospy.signal_shutdown("Emergency stop")
+        
         if self.prev_pose is None:
             return
 
@@ -233,22 +273,6 @@ class PioneerController:
         # Publish the Twist message to control the robot
         self.publisher.publish(ctrl_msg)
 
-        if self.btn_emergencia:
-            rospy.loginfo('Robot stopping by Emergency')
-            rospy.loginfo('Sending emergency stop command')
-
-            for _ in range(10):
-                stop_cmd = Twist()
-                stop_cmd.linear.x = 0.0
-                stop_cmd.linear.y = 0.0
-                stop_cmd.linear.z = 0.0
-                stop_cmd.angular.x = 0.0
-                stop_cmd.angular.y = 0.0
-                stop_cmd.angular.z = 0.0
-                # Publish the Twist message to stop the robot
-                self.publisher.publish(stop_cmd)
-
-            rospy.signal_shutdown("Emergency stop")
 
     def controller(self):
         Kp = np.array([[self.pgains[0], 0],

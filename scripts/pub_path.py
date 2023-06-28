@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import rospy
 from nav_msgs.msg import Odometry
 from std_msgs.msg import Bool
@@ -13,8 +15,8 @@ class CircularPathPublisher:
         rospy.init_node('circular_path_publisher')
 
         self.radius = 1
-        self.freq = 0.1
-        T = 20
+        self.freq = 60
+        T = 30
         self.angular_velocity = 2 * pi / T
 
         self.start_time = None
@@ -28,7 +30,7 @@ class CircularPathPublisher:
         # self.csv_writer = csv.writer(self.csv_file)
         # self.csv_writer.writerow(['Time', 'X', 'Y', 'VX', 'VY'])
 
-        rospy.Timer(rospy.Duration(self.freq), self.publish_odometry)
+        rospy.Timer(rospy.Duration(1/self.freq), self.publish_odometry)
 
         # Initializing emergency button to False
         self.btn_emergencia = False

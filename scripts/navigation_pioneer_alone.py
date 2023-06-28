@@ -26,6 +26,12 @@ class PioneerController:
             PoseStamped,
             self.RobotPose,
             queue_size=40)
+        
+        self.pose_subscriber = rospy.Subscriber(
+            "/vrpn_client_node/OBJ/pose",
+            PoseStamped,
+            self.obstacle_pose,
+            queue_size=40)
 
         self.subscription = rospy.Subscriber(
             'path_pose',
@@ -41,11 +47,8 @@ class PioneerController:
 
         self.timer = rospy.Timer(rospy.Duration(1/30), self.control_loop)
 
-        self.pgains = [1.5, 1, 1.5, 1]
+        self.pgains = [0.25, 0.25, 1.5, 1]
         self.a = 0.3
-
-        self.prev_pose = None
-        self.prev_time = None
 
         # Initializing emergency button to False
         self.btn_emergencia = False
@@ -65,15 +68,21 @@ class PioneerController:
         
         # #### OBSTACULO
         self.obstacle_avoidance = None
-        # self.robot_heigth = 0.5
-        # self.robot_width = 0.5
-        # self.obs_avoidance = ObstacleAvoidance(n=4, a=0.7, b=0.7, k=1)
-        # x_obs = 0.0
-        # y_obs = 5.0
-        # yaw_obs = 70
-        # height_obs = 0.3
-        # width_obs  = 0.7
-        # self.obstacle_pose = [x_obs, y_obs, yaw_obs, height_obs, width_obs]
+        
+        self.robot_heigth = 0.70/2  # Eixo x do robô
+        self.robot_width = 0.65/2   # Eixo y do robô
+        
+        self.obs_avoidance = ObstacleAvoidance(n=2, a=0.7, b=0.7, k=0.3)
+
+        self.obs_height = 0.3/2
+        self.obs_width  = 0.3/2
+        
+        
+        self.prev_pose = None
+        self.prev_time = None
+        
+        self.start_time = None
+        self.past_elapsed_time = 0
 
         rospy.loginfo('Pioneer navigation node started')
 
@@ -110,6 +119,27 @@ class PioneerController:
 
         self.prev_pose = msg.pose
         self.prev_time = time.time()
+        self.elapsed_time = 0
+    
+    def obstacle_pose(self, msg):
+        self.obstacle_avoidance = True
+        self.obstacle = True
+        
+        # Process the pose data
+        pose = msg.pose
+
+        # Process the pose data
+        obstacle_x = pose.position.x
+        obstacle_y = pose.position.y
+        obstacle_z = pose.position.z
+
+        orientation = pose.orientation
+        obstacle_roll, obstacle_pitch, obstacle_yaw = tf.euler_from_quaternion(
+            [orientation.x, orientation.y, orientation.z, orientation.w]
+        )
+        
+        self.obstacle_pose = [obstacle_x, obstacle_y, obstacle_yaw, self.obs_height, self.obs_width]
+        
 
     def calculate_euler_diff(self, current_orientation, previous_orientation):
         # Convert the quaternion objects to lists
@@ -168,12 +198,44 @@ class PioneerController:
             self.btn_emergencia = True
 
     def control_loop(self, event):
+        if self.start_time is None:
+            self.start_time = rospy.Time.now()
+        
+        # Get the current timestamp
+        current_time = rospy.Time.now()
+
+        # Calculate elapsed time
+        self.elapsed_time = float((current_time - self.start_time).to_sec())
+        
+        tme = self.elapsed_time - self.past_elapsed_time
+        
+        # rospy.loginfo('FPS: ' + str(np.round(1/tme, 3)))
+        
+        self.past_elapsed_time = self.elapsed_time
+    
+        if self.btn_emergencia:
+            rospy.loginfo('Robot stopping by Emergency')
+            rospy.loginfo('Sending emergency stop command')
+
+            for _ in range(10):
+                stop_cmd = Twist()
+                stop_cmd.linear.x = 0.0
+                stop_cmd.linear.y = 0.0
+                stop_cmd.linear.z = 0.0
+                stop_cmd.angular.x = 0.0
+                stop_cmd.angular.y = 0.0
+                stop_cmd.angular.z = 0.0
+                # Publish the Twist message to stop the robot
+                self.publisher.publish(stop_cmd)
+
+            rospy.signal_shutdown("Emergency stop")
+        
         if self.prev_pose is None:
             return
 
         desired_linear_velocity, desired_angular_velocity = self.controller()
 
-        #rospy.loginfo('Linear Velocity: ' + str(desired_linear_velocity) + ', Angular Velocity: ' + str(desired_angular_velocity))
+        # rospy.loginfo('Linear Velocity: ' + str(np.round(desired_linear_velocity, 3)) + ', Angular Velocity: ' + str(np.round(desired_angular_velocity, 3)))
 
         ctrl_msg = Twist()
         ctrl_msg.linear.x = desired_linear_velocity
@@ -215,7 +277,7 @@ class PioneerController:
             robot_pose = [self.robot_x, self.robot_y, self.robot_yaw, self.robot_heigth, self.robot_width ]
             x_dot, y_dot = self.obs_avoidance.obstacle_avoidance(robot_pose, self.obstacle_pose)
             desired_velocity = np.array([self.path_linear_x + x_dot, self.path_linear_y + y_dot])
-            rospy.loginfo(str(self.x_dot_avoidance))
+            rospy.loginfo('X dot: ' + str(np.round(x_dot, 3)) + ', Y dot: ' + str(np.round(y_dot, 3)))
         else:
             desired_velocity = np.array([self.path_linear_x, self.path_linear_y])
 
