@@ -4,5 +4,5 @@
     <node pkg="nav_bot_x" type="pioneer_odom.py" name="pioneer_odom" output="screen"/>
     <node pkg="nav_bot_x" type="solverbot_odom.py" name="solverbot_odom" output="screen"/>
     <node pkg="nav_bot_x" type="navigation_pioneer.py" name="navigation_pioneer" output="screen"/>
-    <node pkg="nav_bot_x" type="navigation_solver_bot.py" name="navigation_pioneer" output="screen"/>
+    <node pkg="nav_bot_x" type="navigation_solver_bot.py" name="navigation_solver_bot" output="screen"/>
 </launch>
