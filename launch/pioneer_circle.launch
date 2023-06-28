@@ -1,0 +1,5 @@
+<launch>
+    <node pkg="nav_bot_x" type="emergency_button.py" name="emergency_button" output="screen"/>
+    <node pkg="nav_bot_x" type="pub_path.py" name="pub_path" output="screen"/>
+    <node pkg="nav_bot_x" type="navigation_pioneer_alone.py" name="navigation" output="screen"/>
+</launch>

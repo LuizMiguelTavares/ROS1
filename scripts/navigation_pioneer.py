@@ -32,6 +32,12 @@ class PioneerController:
             Odometry,
             self.Path,
             queue_size=10)
+        
+        self.subscription = rospy.Subscriber(
+            'solver_bot_odom',
+            Odometry,
+            self.solver_bot_path,
+            queue_size=10)
 
         self.subscription = rospy.Subscriber(
             'emergency_flag',
@@ -65,15 +71,30 @@ class PioneerController:
         
         #### OBSTACULO
         self.obstacle_avoidance = True
+        
+        # Pioneer
         self.robot_heigth = 0.5
         self.robot_width = 0.5
-        self.obs_avoidance = ObstacleAvoidance(n=4, a=0.7, b=0.7, k=1)
+        
+        # SolverBot 
+        self.solver_bot_heigth = 0.5
+        self.solver_bot_width = 0.5
+
+        # Obstacle
+        self.obstacle = False # Sets if the obstacle counts
         x_obs = 0.0
         y_obs = 5.0
         yaw_obs = 70
         height_obs = 0.3
         width_obs  = 0.7
         self.obstacle_pose = [x_obs, y_obs, yaw_obs, height_obs, width_obs]
+
+        # Starting Obstacle Avoidance Class
+        self.obs_avoidance = ObstacleAvoidance(n=4, a=0.7, b=0.7, k=1)
+
+        rospy.loginfo('SolverBot navigation node started')
+
+        rospy.loginfo('Pioneer navigation node started')
 
     def RobotPose(self, msg):
         # Process the pose data
@@ -161,6 +182,35 @@ class PioneerController:
         self.path_angular_y = angular_velocity.y
         self.path_angular_z = angular_velocity.z
 
+    def solver_bot_path(self, msg):
+        pose = msg.pose.pose
+        velocity = msg.twist.twist
+
+        # Process the pose and velocity data
+        position = pose.position
+        orientation = pose.orientation
+
+        linear_velocity = velocity.linear
+        angular_velocity = velocity.angular
+
+        # Access specific components of the pose and velocity
+        self.solver_bot_x = position.x
+        self.solver_bot_y = position.y
+        self.solver_bot_z = position.z
+
+        # Convert the transformed orientation quaternion to Euler angles
+        roll, pitch, self.solver_bot_yaw = tf.euler_from_quaternion(
+            [orientation.x, orientation.y, orientation.z, orientation.w]
+        )
+
+        self.solver_bot_linear_x = linear_velocity.x
+        self.solver_bot_linear_y = linear_velocity.y
+        self.solver_bot_linear_z = linear_velocity.z
+
+        self.solver_bot_angular_x = angular_velocity.x
+        self.solver_bot_angular_y = angular_velocity.y
+        self.solver_bot_angular_z = angular_velocity.z
+
     def emergency_button_callback(self, msg):
         if msg.data:
             self.btn_emergencia = True
@@ -209,11 +259,20 @@ class PioneerController:
 
         Xtil = np.array([self.path_x - self.robot_x, self.path_y - self.robot_y])
         
-        if self.obstacle_avoidance is not None:
+        if self.obstacle_avoidance:
             robot_pose = [self.robot_x, self.robot_y, self.robot_yaw, self.robot_heigth, self.robot_width ]
-            x_dot, y_dot = self.obs_avoidance.obstacle_avoidance(robot_pose, self.obstacle_pose)
-            desired_velocity = np.array([self.path_linear_x + x_dot, self.path_linear_y + y_dot])
-            rospy.loginfo(str(self.x_dot_avoidance))
+
+            if self.obstacle:
+                obs_x_dot, obs_y_dot = self.obs_avoidance.obstacle_avoidance(robot_pose, self.obstacle_pose)
+            else:
+                obs_x_dot, obs_y_dot = 0.0, 0.0
+
+            solver_bot_pose = [self.solver_bot_x, self.solver_bot_y, self.solver_bot_yaw, self.solver_bot_heigth, self.solver_bot_width]
+
+            solver_bot_x_dot, solver_bot_y_dot = self.obs_avoidance.obstacle_avoidance(robot_pose, solver_bot_pose)
+
+            desired_velocity = np.array([self.path_linear_x + obs_x_dot + solver_bot_x_dot, self.path_linear_y + obs_y_dot + solver_bot_y_dot])
+            
         else:
             desired_velocity = np.array([self.path_linear_x, self.path_linear_y])
 

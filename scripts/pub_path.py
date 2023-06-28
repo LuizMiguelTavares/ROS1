@@ -33,6 +33,9 @@ class CircularPathPublisher:
         # Initializing emergency button to False
         self.btn_emergencia = False
 
+        rospy.loginfo('Path publisher node started')
+
+
     def publish_odometry(self, event):
         if self.start_time is None:
             self.start_time = rospy.Time.now()
@@ -61,6 +64,7 @@ class CircularPathPublisher:
         odometry.twist.twist.angular = Vector3()
 
         self.publisher.publish(odometry)
+
 
     def emergency_button_callback(self, msg):
         if msg.data:

@@ -1,5 +1,8 @@
 <launch>
     <node pkg="nav_bot_x" type="emergency_button.py" name="emergency_button" output="screen"/>
     <node pkg="nav_bot_x" type="pub_path.py" name="pub_path" output="screen"/>
-    <node pkg="nav_bot_x" type="navigation.py" name="navigation" output="screen"/>
+    <node pkg="nav_bot_x" type="pioneer_odom.py" name="pioneer_odom" output="screen"/>
+    <node pkg="nav_bot_x" type="solverbot_odom.py" name="solverbot_odom" output="screen"/>
+    <node pkg="nav_bot_x" type="navigation_pioneer.py" name="navigation_pioneer" output="screen"/>
+    <node pkg="nav_bot_x" type="navigation_solver_bot.py" name="navigation_pioneer" output="screen"/>
 </launch>

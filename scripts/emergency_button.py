@@ -15,6 +15,7 @@ class EmergencyButtonNode(object):
         self.count = 0
 
         self.publisher = rospy.Publisher('emergency_flag', Bool, queue_size=10)
+        rospy.loginfo('Emergency button node started')
 
     def publishEmergencySignal(self):
         # Method to publish the emergency signal

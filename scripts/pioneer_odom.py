@@ -1,5 +1,6 @@
 import rospy
-from geometry_msgs.msg import PoseStamped
+from geometry_msgs.msg import PoseStamped, Point, Pose, Quaternion, Twist, Vector3
+from nav_msgs.msg import Odometry
 from tf.transformations import euler_from_quaternion
 import time
 import csv
@@ -17,25 +18,26 @@ class OdomPublisher(object):
             queue_size=10
         )
 
-        self.publisher = rospy.Publisher(
-            'robot_pose',
-            PoseStamped,
-            queue_size=10
-        )
+        self.odom_publisher = rospy.Publisher(
+            'pioneer_odom', 
+            Odometry, 
+            queue_size=10)
+        
+        self.odom = Odometry()
 
-        self.timer = rospy.Timer(rospy.Duration(1/30), self.loop)
+        self.timer = rospy.Timer(rospy.Duration(1/60), self.loop)
 
         # Create a CSV file to store the data
-        self.csv_file = open('path_data_low_pass.csv', 'w')
-        self.csv_writer = csv.writer(self.csv_file)
-        self.csv_writer.writerow(['Time', 'X', 'Y', 'W', 'Xd', 'Yd', 'Wd'])
+        # self.csv_file = open('path_data_low_pass.csv', 'w')
+        # self.csv_writer = csv.writer(self.csv_file)
+        # self.csv_writer.writerow(['Time', 'X', 'Y', 'W', 'Xd', 'Yd', 'Wd'])
 
-        self.count = 0
         self.prev_pose = None
         self.prev_time = None
         self.start_time = None
         self.callback_time = None
-        self.alpha = 0.3
+        self.alpha = 1.0 # No filter applied id alpha = 1.0
+
 
     def calculate_euler_diff(self, current_orientation, previous_orientation):
         # Convert the quaternion objects to lists
@@ -53,12 +55,14 @@ class OdomPublisher(object):
 
         return euler_diff
 
+
     def normalize_angle(self, angle):
         while angle > math.pi:
             angle -= 2 * math.pi
         while angle < -math.pi:
             angle += 2 * math.pi
         return angle
+
 
     def loop(self, event):
         current_time = time.time()
@@ -67,10 +71,10 @@ class OdomPublisher(object):
         if self.callback_time is None:
             return
 
-        if np.round((self.callback_time - current_time), 2) != 0.0:
-            # print(np.round((self.callback_time - current_time), 2))
-            # return
-            pass
+        # if np.round((self.callback_time - current_time), 2) != 0.0:
+        #     # print(np.round((self.callback_time - current_time), 2))
+        #     # return
+        #     pass
 
         if self.prev_pose is not None and self.prev_time is not None:
             if self.prev_pose == self.pose:
@@ -104,7 +108,19 @@ class OdomPublisher(object):
         self.prev_time = current_time
 
         # Write the data to the CSV file
-        self.csv_writer.writerow([self.elapsed_time, self.x, self.y, self.w, self.filtered_xd, self.filtered_yd, self.filtered_wd])
+        # self.csv_writer.writerow([self.elapsed_time, self.x, self.y, self.w, self.filtered_xd, self.filtered_yd, self.filtered_wd])
+        
+        self.odom.header.stamp = rospy.Time.now()
+        self.odom.header.frame_id = 'odom'
+        self.odom.child_frame_id = 'base_link'
+        
+        # Populate the position and velocity information
+        self.odom.pose.pose = Pose(Point(self.x, self.y, self.z), self.orientation)
+        self.odom.twist.twist = Twist(Vector3(self.filtered_xd, self.filtered_yd, 0.0), Vector3(0.0, 0.0, self.filtered_wd))
+
+        # Publish the odometry message
+        self.odom_publisher.publish(self.odom)
+
 
     def odom_callback(self, msg):
         # Get the current timestamp
@@ -125,13 +141,14 @@ class OdomPublisher(object):
         # Process the pose data
         self.x = pose.position.x
         self.y = pose.position.y
+        self.z = pose.position.z
 
         orientation = pose.orientation
         self.orientation = orientation
         _, _, self.w = euler_from_quaternion(
             [orientation.x, orientation.y, orientation.z, orientation.w]
         )
-        self.publisher.publish(msg)
+        # self.publisher.publish(msg)
 
 
 def main():

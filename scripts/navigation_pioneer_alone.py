@@ -63,17 +63,19 @@ class PioneerController:
         self.path_angular_y = 0.0
         self.path_angular_z = 0.0
         
-        #### OBSTACULO
-        self.obstacle_avoidance = True
-        self.robot_heigth = 0.5
-        self.robot_width = 0.5
-        self.obs_avoidance = ObstacleAvoidance(n=4, a=0.7, b=0.7, k=1)
-        x_obs = 0.0
-        y_obs = 5.0
-        yaw_obs = 70
-        height_obs = 0.3
-        width_obs  = 0.7
-        self.obstacle_pose = [x_obs, y_obs, yaw_obs, height_obs, width_obs]
+        # #### OBSTACULO
+        self.obstacle_avoidance = None
+        # self.robot_heigth = 0.5
+        # self.robot_width = 0.5
+        # self.obs_avoidance = ObstacleAvoidance(n=4, a=0.7, b=0.7, k=1)
+        # x_obs = 0.0
+        # y_obs = 5.0
+        # yaw_obs = 70
+        # height_obs = 0.3
+        # width_obs  = 0.7
+        # self.obstacle_pose = [x_obs, y_obs, yaw_obs, height_obs, width_obs]
+
+        rospy.loginfo('Pioneer navigation node started')
 
     def RobotPose(self, msg):
         # Process the pose data
