@@ -14,7 +14,7 @@ import math
 
 class PioneerController:
     def __init__(self):
-        rospy.init_node('pioneer_controller')
+        rospy.init_node('solver_bot_controller')
 
         self.publisher = rospy.Publisher(
             '/cmd_vel',
@@ -25,6 +25,12 @@ class PioneerController:
             "/vrpn_client_node/S1/pose",
             PoseStamped,
             self.RobotPose,
+            queue_size=40)
+        
+        self.pose_subscriber = rospy.Subscriber(
+            "/vrpn_client_node/OBJ/pose",
+            PoseStamped,
+            self.obstacle_pose,
             queue_size=40)
 
         self.subscription = rospy.Subscriber(
@@ -42,10 +48,15 @@ class PioneerController:
         self.timer = rospy.Timer(rospy.Duration(1/30), self.control_loop)
 
         self.pgains = [1.5, 1, 1.5, 1]
-        self.a = 0.3 + 0.7# Modificar
+        self.a = 0.3# Modificar
 
         self.prev_pose = None
         self.prev_time = None
+        
+        # Cálculo da velocidade do ponto
+        self.prev_pose_path = None
+        self.prev_time = None
+        self.start_time = None
 
         # Initializing emergency button to False
         self.btn_emergencia = False
@@ -67,24 +78,24 @@ class PioneerController:
         self.obstacle_avoidance = True
 
         # SolverBot 
-        self.robot_heigth = 0.5
-        self.robot_width = 0.5
+        self.robot_heigth = 0.7/2
+        self.robot_width = 0.6/2
         
         # Pioneer
-        self.pioneer_heigth = 0.5
-        self.pioneer_width = 0.5
+        self.pioneer_heigth = 0.7/2
+        self.pioneer_width = 0.6/2
 
         # Obstacle
         self.obstacle = False # Sets if the obstacle counts
-        x_obs = 0.0
-        y_obs = 5.0
-        yaw_obs = 70
-        height_obs = 0.3
-        width_obs  = 0.7
-        self.obstacle_pose = [x_obs, y_obs, yaw_obs, height_obs, width_obs]
+        
+        self.obs_height = 0.3/2
+        self.obs_width  = 0.3/2
 
         # Starting Obstacle Avoidance Class
-        self.obs_avoidance = ObstacleAvoidance(n=4, a=0.7, b=0.7, k=1)
+        self.obs_avoidance = ObstacleAvoidance(n=4, a=0.3, b=0.3, k=0.8)
+        self.pioneer = None
+        
+        self.rho = 0.7 # 1 metro de distância do ponto do robô
 
         rospy.loginfo('SolverBot navigation node started')
 
@@ -119,9 +130,35 @@ class PioneerController:
             self.robot_roll_velocity = euler_diff[0] / time_diff
             self.robot_pitch_velocity = euler_diff[1] / time_diff
             self.robot_yaw_velocity = euler_diff[2] / time_diff
+            
+            #rospy.loginfo(str('Xr: ' + str(np.round(msg.pose.position.x, 3)) + ', Yr: ' + str(np.round(msg.pose.position.y, 3))))
+            #rospy.loginfo(str('Prev X: ' + str(np.round(self.prev_pose.position.x, 3)) + ', prev Y: ' + str(np.round(self.prev_pose.position.y, 3))))
+            #rospy.loginfo(str('Time diff: ' + str(np.round(time_diff, 8))))
+            
+            #rospy.loginfo(str('X dot: ' + str(np.round(self.robot_linear_x, 3)) + ', Y dot: ' + str(np.round(self.robot_linear_y, 3))))
+            #rospy.loginfo('')
 
         self.prev_pose = msg.pose
         self.prev_time = time.time()
+    
+    def obstacle_pose(self, msg):
+    
+        self.obstacle = True
+        
+        # Process the pose data
+        pose = msg.pose
+
+        # Process the pose data
+        obstacle_x = pose.position.x
+        obstacle_y = pose.position.y
+        obstacle_z = pose.position.z
+
+        orientation = pose.orientation
+        obstacle_roll, obstacle_pitch, obstacle_yaw = tf.euler_from_quaternion(
+            [orientation.x, orientation.y, orientation.z, orientation.w]
+        )
+        
+        self.obstacle_pose = [obstacle_x, obstacle_y, obstacle_yaw, self.obs_height, self.obs_width]
 
 
     def calculate_euler_diff(self, current_orientation, previous_orientation):
@@ -149,6 +186,9 @@ class PioneerController:
 
 
     def pioneer_path(self, msg):
+    
+        self.pioneer = True
+        
         pose = msg.pose.pose
         velocity = msg.twist.twist
 
@@ -160,17 +200,52 @@ class PioneerController:
         angular_velocity = velocity.angular
 
         # Access specific components of the pose and velocity
-        self.path_x = position.x
-        self.path_y = position.y
+        self.pioneer_obs_x = position.x
+        self.pioneer_obs_y = position.y
         self.path_z = position.z
 
         # Convert the transformed orientation quaternion to Euler angles
         roll, pitch, self.path_yaw = tf.euler_from_quaternion(
             [orientation.x, orientation.y, orientation.z, orientation.w]
         )
+        
+        self.path_x = position.x - self.rho*np.cos(self.path_yaw)
+        self.path_y = position.y - self.rho*np.sin(self.path_yaw)
+        
+        # Início de velocidade
+        if self.start_time is None:
+            self.start_time = rospy.Time.now()
+            pose_path = np.array([self.path_x, self.path_y])
+            self.prev_pose_path = pose_path
 
-        self.path_linear_x = linear_velocity.x
-        self.path_linear_y = linear_velocity.y
+        # Get the current timestamp
+        current_time = rospy.Time.now()
+
+        # Calculate elapsed time
+        elapsed_time = (current_time - self.start_time).to_sec()
+
+        # Cálculo da velocidade do ponto de controle
+        if elapsed_time >= 1/30:
+
+            # Calculate linear velocity
+            self.path_linear_x = (self.path_x - self.prev_pose_path[0]) / elapsed_time
+            self.path_linear_y = (self.path_y - self.prev_pose_path[1]) / elapsed_time
+            
+            self.start_time = None
+            
+            #rospy.loginfo(str('X: ' + str(np.round(self.path_x, 3)) + ', Y: ' + str(np.round(self.path_y, 3))))
+            #rospy.loginfo(str('Prev X: ' + str(np.round(self.prev_pose_path[0], 3)) + ', prev Y: ' + str(np.round(self.prev_pose_path[1], 3))))
+            #rospy.loginfo(str('elapsed_time: ' + str(np.round(elapsed_time, 8))))
+            
+            #rospy.loginfo(str('X dot: ' + str(np.round(self.path_linear_x, 3)) + ', Y dot: ' + str(np.round(self.path_linear_y, 3))))
+            #rospy.loginfo('')
+	
+        
+        # Se não der certo
+        #self.path_linear_x = linear_velocity.x
+        #self.path_linear_y = linear_velocity.y
+
+        # Não é usado
         self.path_linear_z = linear_velocity.z
 
         self.path_angular_x = angular_velocity.x
@@ -201,13 +276,13 @@ class PioneerController:
                 self.publisher.publish(stop_cmd)
 
             rospy.signal_shutdown("Emergency stop")
-
+            
         if self.prev_pose is None:
             return
 
         desired_linear_velocity, desired_angular_velocity = self.controller()
 
-        #rospy.loginfo('Linear Velocity: ' + str(desired_linear_velocity) + ', Angular Velocity: ' + str(desired_angular_velocity))
+        # rospy.loginfo('Linear Velocity: ' + str(desired_linear_velocity) + ', Angular Velocity: ' + str(desired_angular_velocity))
 
         ctrl_msg = Twist()
         ctrl_msg.linear.x = desired_linear_velocity
@@ -219,6 +294,7 @@ class PioneerController:
         # Publish the Twist message to control the robot
         self.publisher.publish(ctrl_msg)
 
+
     def controller(self):
         Kp = np.array([[self.pgains[0], 0],
                        [0, self.pgains[1]]])
@@ -228,41 +304,73 @@ class PioneerController:
 
         Xtil = np.array([self.path_x - self.robot_x, self.path_y - self.robot_y])
         
+        #rospy.loginfo(str(np.round(Xtil, 3)))
+        #if np.abs(Xtil[0]) < 0.1 and np.abs(Xtil[1]) < 0.1:
+        #    return 0.0, 0.0
+        
+        if self.pioneer is None:
+            rospy.loginfo('Não foi possível encontrar o Pioneer!')
+            return 0.0, 0.0
+        
+        # Observa se existe qualquer obstáculo
         if self.obstacle_avoidance:
+            
+            # Segurança caso os robôs cheguem muito perto um do outro
+            ui = np.array([self.pioneer_obs_x, self.pioneer_obs_y])
+            ai = np.array([self.robot_x, self.robot_y])
+            distancia = np.linalg.norm(ui - ai)
+            if distancia <  self.robot_heigth*2:
+                rospy.loginfo('Deu ruim: ' + str(np.round(distancia, 3)))
+                return 0.0, 0.0
+            
+            # Pose do robô
             robot_pose = [self.robot_x, self.robot_y, self.robot_yaw, self.robot_heigth, self.robot_width ]
-
+	    
+	    # Observa se existe obstáculo fixo
             if self.obstacle:
                 obs_x_dot, obs_y_dot = self.obs_avoidance.obstacle_avoidance(robot_pose, self.obstacle_pose)
             else:
                 obs_x_dot, obs_y_dot = 0.0, 0.0
-
-            pioneer_pose = [self.path_x, self.path_y, self.path_yaw, self.pioneer_heigth, self.pioneer_width]
-
+            
+            # Desvio de obstáculo contra o Pioneer
+            pioneer_pose = [self.pioneer_obs_x, self.pioneer_obs_y, self.path_yaw, self.pioneer_heigth, self.pioneer_width]
             pioneer_x_dot, pioneer_y_dot = self.obs_avoidance.obstacle_avoidance(robot_pose, pioneer_pose)
+            
+            # Somatória dos pesos dos obstáculos
+            vobs = np.array([obs_x_dot + pioneer_x_dot, obs_y_dot + pioneer_y_dot])
+            nu_obs = (1 - np.abs(np.tanh(vobs)))
+            
+            # Ganhos do controlador 
+            k1 = 0.3 # Ganho do Xtil
+            k2 = 1.5 # Ganho do obstáculo
+            k3 = 1   # GAnho interno do obstáculo
 
-            desired_velocity = np.array([self.path_linear_x + obs_x_dot + pioneer_x_dot, self.path_linear_y + obs_y_dot + pioneer_y_dot])
+            Xtil = np.tanh(Xtil) * nu_obs.T * k1
+            path_velocity = np.array([self.path_linear_x, self.path_linear_y]) * nu_obs.T
+            obs_velocity = k2 * np.tanh(k3*vobs)
+            
+            desired_velocity = path_velocity + Xtil + obs_velocity
+            #rospy.loginfo('Desired velocity' + str(np.round(desired_velocity, 3)))
+            reference_velocity = np.dot(np.linalg.inv(K), desired_velocity)
 
         else:
             desired_velocity = np.array([self.path_linear_x, self.path_linear_y])
-
-        reference_velocity = np.dot(np.linalg.inv(K), (desired_velocity.T + np.dot(Kp, Xtil.T)))
-        
-        #rospy.loginfo(str(self.robot_x - self.path_x) + ' ' + str(Xtil[0]) + ' ' +  str(Xtil[1]))
+            reference_velocity = np.dot(np.linalg.inv(K), (desired_velocity.T + np.dot(Kp, Xtil.T)))
 
         desired_linear_velocity = reference_velocity[0]
         desired_angular_velocity = reference_velocity[1]
 
-        if np.abs(desired_linear_velocity) > 0.5:
-            desired_linear_velocity = np.sign(desired_linear_velocity)*0.5
+        if np.abs(desired_linear_velocity) > 0.35:
+            desired_linear_velocity = np.sign(desired_linear_velocity)*0.35
 
-        if np.abs(desired_angular_velocity) > 0.5:
-            desired_angular_velocity = np.sign(desired_angular_velocity)*0.5
+        if np.abs(desired_angular_velocity) > 0.35:
+            desired_angular_velocity = np.sign(desired_angular_velocity)*0.35
 
         return desired_linear_velocity, desired_angular_velocity
 
 
 def main():
-    rospy.init_node('pioneer_controller')
+    rospy.init_node('solver_bot_controller')
 
     controller = PioneerController()
 

@@ -16,7 +16,7 @@ class CircularPathPublisher:
 
         self.radius = 1
         self.freq = 60
-        T = 30
+        T = 80
         self.angular_velocity = 2 * pi / T
 
         self.start_time = None

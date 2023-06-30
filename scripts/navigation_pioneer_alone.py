@@ -72,7 +72,7 @@ class PioneerController:
         self.robot_heigth = 0.70/2  # Eixo x do robô
         self.robot_width = 0.65/2   # Eixo y do robô
         
-        self.obs_avoidance = ObstacleAvoidance(n=2, a=0.7, b=0.7, k=0.3)
+        self.obs_avoidance = ObstacleAvoidance(n=4, a=0.35, b=0.35, k=1.0)
 
         self.obs_height = 0.3/2
         self.obs_width  = 0.3/2
@@ -275,15 +275,29 @@ class PioneerController:
         
         if self.obstacle_avoidance is not None:
             robot_pose = [self.robot_x, self.robot_y, self.robot_yaw, self.robot_heigth, self.robot_width ]
+            
             x_dot, y_dot = self.obs_avoidance.obstacle_avoidance(robot_pose, self.obstacle_pose)
             desired_velocity = np.array([self.path_linear_x + x_dot, self.path_linear_y + y_dot])
-            rospy.loginfo('X dot: ' + str(np.round(x_dot, 3)) + ', Y dot: ' + str(np.round(y_dot, 3)))
+            
+            vobs = np.array([x_dot, y_dot])
+            nu_obs = (1 - np.abs(np.tanh(vobs)))
+            
+            # Ganhos do controlador 
+            k1 = 0.3 # Ganho do Xtil
+            k2 = 1.5 # Ganho do obstáculo
+            k3 = 1   # GAnho interno do obstáculo
+
+            Xtil = np.tanh(Xtil) * nu_obs.T * k1
+            path_velocity = np.array([self.path_linear_x, self.path_linear_y]) * nu_obs.T
+            obs_velocity = k2 * np.tanh(k3*vobs)
+            
+            desired_velocity = path_velocity + Xtil + obs_velocity
+            rospy.loginfo('Desired velocity' + str(np.round(desired_velocity, 3)))
+            reference_velocity = np.dot(np.linalg.inv(K), desired_velocity)
+            
         else:
             desired_velocity = np.array([self.path_linear_x, self.path_linear_y])
-
-        reference_velocity = np.dot(np.linalg.inv(K), (desired_velocity.T + np.dot(Kp, Xtil.T)))
-        
-        #rospy.loginfo(str(self.robot_x - self.path_x) + ' ' + str(Xtil[0]) + ' ' +  str(Xtil[1]))
+            reference_velocity = np.dot(np.linalg.inv(K), (desired_velocity.T + np.dot(Kp, Xtil.T)))
 
         desired_linear_velocity = reference_velocity[0]
         desired_angular_velocity = reference_velocity[1]
