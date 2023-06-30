@@ -6,6 +6,7 @@ from nav_msgs.msg import Odometry
 from tf.transformations import euler_from_quaternion
 import time
 import csv
+import os
 import math
 import numpy as np
 
@@ -13,6 +14,28 @@ import numpy as np
 class OdomPublisher(object):
     def __init__(self):
         rospy.init_node('odom_publisher')
+
+        self.odom = Odometry()
+
+        self.timer = rospy.Timer(rospy.Duration(1/60), self.loop)
+        
+        # Create a CSV file to store the data
+        folder_path = '/root/data/'
+
+        # Create the file in the specified folder
+        file_path = os.path.join(folder_path, 'pioneer_odom.csv')
+        csv_file = open(file_path, 'w')
+
+        self.csv_writer = csv.writer(csv_file)
+
+        self.csv_writer.writerow(['Time', 'X', 'Y', 'W', 'Xd', 'Yd', 'Wd'])
+
+        self.prev_pose = None
+        self.prev_time = None
+        self.start_time = None
+        self.callback_time = None
+        self.alpha = 1.0 # No filter applied id alpha = 1.0
+        
         self.subscription = rospy.Subscriber(
             '/vrpn_client_node/P1/pose',
             PoseStamped,
@@ -24,21 +47,6 @@ class OdomPublisher(object):
             'pioneer_odom', 
             Odometry, 
             queue_size=10)
-        
-        self.odom = Odometry()
-
-        self.timer = rospy.Timer(rospy.Duration(1/60), self.loop)
-
-        # Create a CSV file to store the data
-        # self.csv_file = open('path_data_low_pass.csv', 'w')
-        # self.csv_writer = csv.writer(self.csv_file)
-        # self.csv_writer.writerow(['Time', 'X', 'Y', 'W', 'Xd', 'Yd', 'Wd'])
-
-        self.prev_pose = None
-        self.prev_time = None
-        self.start_time = None
-        self.callback_time = None
-        self.alpha = 1.0 # No filter applied id alpha = 1.0
 
 
     def calculate_euler_diff(self, current_orientation, previous_orientation):
@@ -110,7 +118,7 @@ class OdomPublisher(object):
         self.prev_time = current_time
 
         # Write the data to the CSV file
-        # self.csv_writer.writerow([self.elapsed_time, self.x, self.y, self.w, self.filtered_xd, self.filtered_yd, self.filtered_wd])
+        self.csv_writer.writerow([current_time, self.x, self.y, self.w, self.filtered_xd, self.filtered_yd, self.filtered_wd])
         
         self.odom.header.stamp = rospy.Time.now()
         self.odom.header.frame_id = 'odom'
@@ -150,7 +158,6 @@ class OdomPublisher(object):
         _, _, self.w = euler_from_quaternion(
             [orientation.x, orientation.y, orientation.z, orientation.w]
         )
-        # self.publisher.publish(msg)
 
 
 def main():

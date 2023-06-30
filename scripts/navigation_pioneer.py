@@ -11,6 +11,9 @@ import numpy as np
 import time
 import math
 
+import csv
+import os
+
 
 class PioneerController:
     def __init__(self):
@@ -18,6 +21,7 @@ class PioneerController:
         
         self.prev_pose = None
         self.prev_time = None
+        self.start_time = None
 
         self.pgains = [1.5, 1, 1.5, 1]
         self.a = 0.3
@@ -39,7 +43,7 @@ class PioneerController:
         self.path_angular_z = 0.0
         
         #### OBSTACULO
-        self.obstacle_avoidance = True
+        self.obstacle_avoidance = None
         
         # Pioneer
         self.robot_heigth = 0.7/2
@@ -51,12 +55,29 @@ class PioneerController:
 
         # Obstacle
         self.obstacle = False # Sets if the obstacle counts
+        self.solver_bot = False # Sets if the solver_bot is online counts
         
         self.obs_height = 0.3/2
         self.obs_width  = 0.3/2
 
         # Starting Obstacle Avoidance Class
         self.obs_avoidance = ObstacleAvoidance(n=4, a=0.35, b=0.35, k=1.0)
+        
+        # Specify the folder path where you want to create the file
+        folder_path = '/root/data/'
+
+        # Create the file in the specified folder
+        file_path = os.path.join(folder_path, 'obstacle_detection_pioneer.csv')
+        csv_file = open(file_path, 'w')
+        
+        # Create a CSV file to store the data
+        self.csv_writer = csv.writer(csv_file)
+        self.csv_writer.writerow(['Time',
+                                  'X_robot_solver', 'Y_robot_solver', 
+                                  'X_solver_robot', 'Y_solver_robot', 
+                                  'X_robot_obs', 'Y_robot_obs', 
+                                  'X_obs_robot', 'Y_obs_robot', 
+                                  'X_dot', 'Y_dot'])
         
         self.publisher = rospy.Publisher(
             '/RosAria/cmd_vel',
@@ -98,6 +119,7 @@ class PioneerController:
         rospy.loginfo('Pioneer navigation node started')
 
     def RobotPose(self, msg):
+
         # Process the pose data
         pose = msg.pose
 
@@ -133,7 +155,7 @@ class PioneerController:
     
     
     def obstacle_pose(self, msg):
-    
+        self.obstacle_avoidance = True
         self.obstacle = True
         
         # Process the pose data
@@ -205,6 +227,9 @@ class PioneerController:
         self.path_angular_z = angular_velocity.z
 
     def solver_bot_path(self, msg):
+        
+        self.obstacle_avoidance = True
+        self.solver_bot = True
         pose = msg.pose.pose
         velocity = msg.twist.twist
 
@@ -238,6 +263,16 @@ class PioneerController:
             self.btn_emergencia = True
 
     def control_loop(self, event):
+
+        self.current_time = rospy.Time.now()
+        
+        
+        if self.start_time == None:
+            self.start_time = self.current_time
+        
+        # Calculate elapsed time
+        self.elapsed_time = (self.current_time - self.start_time).to_sec()
+            
     
         if self.btn_emergencia:
             rospy.loginfo('Robot stopping by Emergency')
@@ -258,9 +293,9 @@ class PioneerController:
         
         if self.prev_pose is None:
             return
-
+        
         desired_linear_velocity, desired_angular_velocity = self.controller()
-
+        
         #rospy.loginfo('Linear Velocity: ' + str(desired_linear_velocity) + ', Angular Velocity: ' + str(desired_angular_velocity))
 
         ctrl_msg = Twist()
@@ -296,15 +331,28 @@ class PioneerController:
             robot_pose = [self.robot_x, self.robot_y, self.robot_yaw, self.robot_heigth, self.robot_width ]
 
             if self.obstacle:
-                obs_x_dot, obs_y_dot = self.obs_avoidance.obstacle_avoidance(robot_pose, self.obstacle_pose)
+                obs_x_dot, obs_y_dot, pose_robot_obs, pose_obs_robot = self.obs_avoidance.obstacle_avoidance(robot_pose, self.obstacle_pose)
             else:
-                obs_x_dot, obs_y_dot = 0.0, 0.0
-
-            solver_bot_pose = [self.solver_bot_x, self.solver_bot_y, self.solver_bot_yaw, self.solver_bot_heigth, self.solver_bot_width]
-            solver_bot_x_dot, solver_bot_y_dot = self.obs_avoidance.obstacle_avoidance(robot_pose, solver_bot_pose)
+                obs_x_dot, obs_y_dot, pose_robot_obs, pose_obs_robot = 0.0, 0.0, [None, None], [None, None]
+            
+            if self.solver_bot:
+                solver_bot_pose = [self.solver_bot_x, self.solver_bot_y, self.solver_bot_yaw, self.solver_bot_heigth, self.solver_bot_width]
+                solver_bot_x_dot, solver_bot_y_dot, pose_robot_solver, pose_solver_robot = self.obs_avoidance.obstacle_avoidance(robot_pose, solver_bot_pose)
+            else:
+                solver_bot_x_dot, solver_bot_y_dot, pose_robot_solver, pose_solver_robot = 0.0, 0.0, [None, None], [None, None]
             
             # Somatória dos pesos dos obstáculos
             vobs = np.array([obs_x_dot + solver_bot_x_dot, obs_y_dot + solver_bot_y_dot])
+
+            # Write the data to the CSV file
+            # ['Time', 'X_robot_solver', 'Y_robot_solver', 'X_solver_robot', 'Y_solver_robot', 'X_robot_obs', 'Y_robot_obs', 'X_obs_robot', 'Y_obs_robot', 'X_dot', 'Y_dot']
+            self.csv_writer.writerow([self.current_time.to_sec(), 
+                                      pose_robot_solver[0], pose_robot_solver[1], 
+                                      pose_solver_robot[0], pose_solver_robot[1],
+                                      pose_robot_obs[0], pose_robot_obs[1], 
+                                      pose_obs_robot[0], pose_obs_robot[1], 
+                                      vobs[0], vobs[1]])
+        
             nu_obs = (1 - np.abs(np.tanh(vobs)))
             
             # Ganhos do controlador 

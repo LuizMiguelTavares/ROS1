@@ -16,7 +16,7 @@ class CircularPathPublisher:
 
         self.radius = 1
         self.freq = 60
-        T = 80
+        T = 40
         self.angular_velocity = 2 * pi / T
 
         self.start_time = None
@@ -26,9 +26,14 @@ class CircularPathPublisher:
         self.subscription = rospy.Subscriber('emergency_flag', Bool, self.emergency_button_callback, queue_size=10)
 
         # Create a CSV file to store the data
-        # self.csv_file = open('circular_path_data.csv', 'w')
-        # self.csv_writer = csv.writer(self.csv_file)
-        # self.csv_writer.writerow(['Time', 'X', 'Y', 'VX', 'VY'])
+        folder_path = '/root/data/'
+
+        # Create the file in the specified folder
+        file_path = os.path.join(folder_path, 'circular_path_data.csv')
+        csv_file = open(file_path, 'w')
+
+        self.csv_writer = csv.writer(csv_file)
+        self.csv_writer.writerow(['Time', 'X', 'Y', 'VX', 'VY'])
 
         rospy.Timer(rospy.Duration(1/self.freq), self.publish_odometry)
 
@@ -54,7 +59,7 @@ class CircularPathPublisher:
         vy = self.radius * self.angular_velocity * cos(self.angular_velocity * elapsed_time)
 
         # # Write the data to the CSV file
-        # self.csv_writer.writerow([elapsed_time, x, y, vx, vy])
+        self.csv_writer.writerow([current_time.to_sec(), x, y, vx, vy])
 
         # Create the Odometry message
         odometry = Odometry()

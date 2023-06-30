@@ -15,14 +15,14 @@ class OdomPublisher(object):
     def __init__(self):
         rospy.init_node('odom_publisher')
         self.subscription = rospy.Subscriber(
-            '/vrpn_client_node/S1/pose',
+            '/vrpn_client_node/P1/pose',
             PoseStamped,
             self.odom_callback,
             queue_size=10
         )
 
         self.odom_publisher = rospy.Publisher(
-            'solver_bot_odom', 
+            'pioneer_odom', 
             Odometry, 
             queue_size=10)
         
@@ -30,11 +30,10 @@ class OdomPublisher(object):
 
         self.timer = rospy.Timer(rospy.Duration(1/60), self.loop)
         
-        # Create a CSV file to store the data
         folder_path = '/root/data/'
 
         # Create the file in the specified folder
-        file_path = os.path.join(folder_path, 'solverbot_odom.csv')
+        file_path = os.path.join(folder_path, 'object_odom.csv')
         csv_file = open(file_path, 'w')
 
         self.csv_writer = csv.writer(csv_file)
@@ -78,11 +77,6 @@ class OdomPublisher(object):
         # If the time of the callback is essentially the same as the control loop time
         if self.callback_time is None:
             return
-
-        # if np.round((self.callback_time - current_time), 2) != 0.0:
-        #     # print(np.round((self.callback_time - current_time), 2))
-        #     # return
-        #     pass
 
         if self.prev_pose is not None and self.prev_time is not None:
             if self.prev_pose == self.pose:
