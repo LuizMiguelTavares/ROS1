@@ -26,9 +26,9 @@ class CircularPathPublisher:
 
         # Create the file in the specified folder
         file_path = os.path.join(folder_path, 'circular_path_data.csv')
-        csv_file = open(file_path, 'w')
+        self.csv_file = open(file_path, 'w')
 
-        self.csv_writer = csv.writer(csv_file)
+        self.csv_writer = csv.writer(self.csv_file)
         self.csv_writer.writerow(['Time', 'X', 'Y', 'VX', 'VY'])
 
         self.publisher = rospy.Publisher('path_pose', 
@@ -81,6 +81,11 @@ class CircularPathPublisher:
             rospy.signal_shutdown('Emergency stop')
 
 
-if __name__ == '__main__':
-    circular_path_publisher = CircularPathPublisher()
+def main():
+    circular_path = CircularPathPublisher()
     rospy.spin()
+    circular_path.csv_file.close()
+
+
+if __name__ == '__main__':
+    main()

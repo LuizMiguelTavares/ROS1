@@ -24,9 +24,9 @@ class OdomPublisher(object):
 
         # Create the file in the specified folder
         file_path = os.path.join(folder_path, 'solverbot_odom.csv')
-        csv_file = open(file_path, 'w')
+        self.csv_file = open(file_path, 'w')
 
-        self.csv_writer = csv.writer(csv_file)
+        self.csv_writer = csv.writer(self.csv_file)
         self.csv_writer.writerow(['Time', 'X', 'Y', 'W', 'Xd', 'Yd', 'Wd'])
 
         self.prev_pose = None

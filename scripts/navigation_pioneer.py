@@ -24,7 +24,7 @@ class PioneerController:
         self.start_time = None
 
         self.pgains = [1.5, 1, 1.5, 1]
-        self.a = 0.3
+        self.a = 0.15
 
         # Initializing emergency button to False
         self.btn_emergencia = False
@@ -48,6 +48,8 @@ class PioneerController:
         # Pioneer
         self.robot_heigth = 0.7/2
         self.robot_width = 0.6/2
+        #REAL
+        # 45x51
         
         # SolverBot 
         self.solver_bot_heigth = 0.7/2
@@ -68,11 +70,11 @@ class PioneerController:
 
         # Create the file in the specified folder
         file_path = os.path.join(folder_path, 'obstacle_detection_pioneer.csv')
-        csv_file = open(file_path, 'w')
-        
-        # Create a CSV file to store the data
-        self.csv_writer = csv.writer(csv_file)
-        self.csv_writer.writerow(['Time',
+
+        self.csv_file = open(file_path, 'w')
+
+        self.csv_writer = csv.writer(self.csv_file)
+        self.csv_writer.writerow(['Time', 'X til',
                                   'X_robot_solver', 'Y_robot_solver', 
                                   'X_solver_robot', 'Y_solver_robot', 
                                   'X_robot_obs', 'Y_robot_obs', 
@@ -132,6 +134,9 @@ class PioneerController:
         self.robot_roll, self.robot_pitch, self.robot_yaw = tf.euler_from_quaternion(
             [orientation.x, orientation.y, orientation.z, orientation.w]
         )
+        
+        self.robot_x = self.robot_x + self.a*np.cos(self.robot_yaw)
+        self.robot_y = self.robot_y + self.a*np.sin(self.robot_yaw)
 
         if self.prev_pose is not None and self.prev_time is not None:
             current_time = time.time()
@@ -316,7 +321,7 @@ class PioneerController:
         K = np.array([[np.cos(self.robot_yaw), -self.a*np.sin(self.robot_yaw)],
                       [np.sin(self.robot_yaw), self.a*np.cos(self.robot_yaw)]])
 
-        Xtil = np.array([self.path_x - self.robot_x, self.path_y - self.robot_y])
+        Xtil = np.array([self.path_x - self.robot_x, self.path_y - self.robot_y]) 
         
         if self.obstacle_avoidance:
             
@@ -346,7 +351,7 @@ class PioneerController:
 
             # Write the data to the CSV file
             # ['Time', 'X_robot_solver', 'Y_robot_solver', 'X_solver_robot', 'Y_solver_robot', 'X_robot_obs', 'Y_robot_obs', 'X_obs_robot', 'Y_obs_robot', 'X_dot', 'Y_dot']
-            self.csv_writer.writerow([self.current_time.to_sec(), 
+            self.csv_writer.writerow([self.current_time.to_sec(), np.linalg.norm(Xtil),
                                       pose_robot_solver[0], pose_robot_solver[1], 
                                       pose_solver_robot[0], pose_solver_robot[1],
                                       pose_robot_obs[0], pose_robot_obs[1], 
@@ -375,11 +380,11 @@ class PioneerController:
         desired_linear_velocity = reference_velocity[0]
         desired_angular_velocity = reference_velocity[1]
 
-        if np.abs(desired_linear_velocity) > 0.35:
-            desired_linear_velocity = np.sign(desired_linear_velocity)*0.35
+        if np.abs(desired_linear_velocity) > 0.5:
+            desired_linear_velocity = np.sign(desired_linear_velocity)*0.5
 
-        if np.abs(desired_angular_velocity) > 0.35:
-            desired_angular_velocity = np.sign(desired_angular_velocity)*0.35
+        if np.abs(desired_angular_velocity) > 0.5:
+            desired_angular_velocity = np.sign(desired_angular_velocity)*0.5
 
         return desired_linear_velocity, desired_angular_velocity
 

@@ -10,6 +10,8 @@ from math import cos, sin, pi
 import numpy as np
 import time
 import math
+import csv
+import os
 
 
 class PioneerController:
@@ -74,11 +76,11 @@ class PioneerController:
         file_path_obs_detection = os.path.join(folder_path, 'obstacle_detection_pioneer.csv')
         file_path_pioneer_path = os.path.join(folder_path, 'solverbot_path.csv')
         
-        csv_file = open(file_path_obs_detection, 'w')
-        csv_file2 = open(file_path_pioneer_path, 'w')
+        self.csv_file = open(file_path_obs_detection, 'w')
+        self.csv_file2 = open(file_path_pioneer_path, 'w')
         
         # Create a CSV file to store the data
-        self.csv_writer = csv.writer(csv_file)
+        self.csv_writer = csv.writer(self.csv_file)
         self.csv_writer.writerow(['Time',
                                   'X_robot_pioneer', 'Y_robot_pioneer', 
                                   'X_pioneer_robot', 'Y_pioneer_robot', 
@@ -86,7 +88,7 @@ class PioneerController:
                                   'X_obs_robot', 'Y_obs_robot', 
                                   'X_dot', 'Y_dot'])
         
-        self.csv_writer2 = csv.writer(csv_file2)
+        self.csv_writer2 = csv.writer(self.csv_file2)
         self.csv_writer2.writerow(['Time',
                                   'X_solver_path', 'Y_solver_path', 
                                   'X_dot_solver_path', 'Y_dot_solver_path'])
@@ -406,8 +408,6 @@ class PioneerController:
 
 
 def main():
-    rospy.init_node('solver_bot_controller')
-
     controller = PioneerController()
 
     try:

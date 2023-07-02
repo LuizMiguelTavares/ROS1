@@ -25,17 +25,18 @@ class OdomPublisher(object):
 
         # Create the file in the specified folder
         file_path = os.path.join(folder_path, 'pioneer_odom.csv')
-        csv_file = open(file_path, 'w')
+        self.csv_file = open(file_path, 'w')
 
-        self.csv_writer = csv.writer(csv_file)
+        self.csv_writer = csv.writer(self.csv_file)
 
-        self.csv_writer.writerow(['Time', 'X', 'Y', 'W', 'Xd', 'Yd', 'Wd'])
+        self.csv_writer.writerow(['Time', 'X', 'Y', 'X_controle','Y_controle','W', 'Xd', 'Yd', 'Wd'])
 
         self.prev_pose = None
         self.prev_time = None
         self.start_time = None
         self.callback_time = None
         self.alpha = 1.0 # No filter applied id alpha = 1.0
+        self.a = 0.15
         
         self.subscription = rospy.Subscriber(
             '/vrpn_client_node/P1/pose',
@@ -126,7 +127,7 @@ class OdomPublisher(object):
         self.prev_time = current_time
 
         # Write the data to the CSV file
-        self.csv_writer.writerow([current_time, self.x, self.y, self.w, self.filtered_xd, self.filtered_yd, self.filtered_wd])
+        self.csv_writer.writerow([current_time, self.x, self.y, self.control_x, self.control_y, self.w, self.filtered_xd, self.filtered_yd, self.filtered_wd])
         
         self.odom.header.stamp = rospy.Time.now()
         self.odom.header.frame_id = 'odom'
@@ -166,6 +167,9 @@ class OdomPublisher(object):
         _, _, self.w = euler_from_quaternion(
             [orientation.x, orientation.y, orientation.z, orientation.w]
         )
+        
+        self.control_x = self.x + self.a*np.cos(self.w)
+        self.control_y = self.y + self.a*np.sin(self.w)
 
 
 def main():

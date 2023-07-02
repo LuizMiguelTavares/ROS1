@@ -45,6 +45,8 @@ def poda(*args, column='Time'):
     times = np.linspace(biggest_first_value, smallest_last_value, num=smallest_dataset)
     new_datasets = []
 
+    fps = int(1/((smallest_last_value - biggest_first_value)/smallest_dataset))
+
     for arg in args:
         indices = find_closest_arg(arg[column], times)
 
@@ -52,9 +54,9 @@ def poda(*args, column='Time'):
         data.reset_index(drop=True, inplace=True)
         new_datasets.append(data)
     
-    return new_datasets
+    return new_datasets, fps
 
-circular_path, pioneer_odom, obstacle_odom, obstacle_detection_pioneer = poda(circular_path, pioneer_odom, obstacle_odom, obstacle_detection_pioneer)
+circular_path, pioneer_odom, obstacle_odom, obstacle_detection_pioneer, fps = poda(circular_path, pioneer_odom, obstacle_odom, obstacle_detection_pioneer)
 
 def rotation_matrix(theta):
     cos_theta = np.cos(theta)
@@ -130,4 +132,4 @@ def update_frame(i):
     plt.draw()
 
 ani = FuncAnimation(fig, update_frame, frames=int(len(pioneer_odom)/2), repeat=False)
-ani.save('animation.gif', writer='pillow', fps=30)
+ani.save('animation.gif', writer='pillow', fps=fps)
