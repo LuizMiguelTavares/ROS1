@@ -103,7 +103,7 @@ class PioneerController:
             queue_size=40)
         
         self.pose_subscriber = rospy.Subscriber(
-            "/vrpn_client_node/OBJ/pose",
+            "/vrpn_client_node/OBS/pose",
             PoseStamped,
             self.obstacle_pose,
             queue_size=40)

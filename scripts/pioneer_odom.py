@@ -3,6 +3,7 @@
 import rospy
 from geometry_msgs.msg import PoseStamped, Point, Pose, Quaternion, Twist, Vector3
 from nav_msgs.msg import Odometry
+from std_msgs.msg import Bool
 from tf.transformations import euler_from_quaternion
 import time
 import csv
@@ -47,6 +48,17 @@ class OdomPublisher(object):
             'pioneer_odom', 
             Odometry, 
             queue_size=10)
+        
+        self.subscription = rospy.Subscriber(
+            'emergency_flag',
+            Bool,
+            self.emergency_button_callback,
+            queue_size=10)
+    
+    def emergency_button_callback(self, msg):
+        if msg.data:
+            rospy.loginfo('Pioneer Odom stopping by Emergency')
+            rospy.signal_shutdown('Emergency stop')
 
 
     def calculate_euler_diff(self, current_orientation, previous_orientation):
@@ -75,16 +87,12 @@ class OdomPublisher(object):
 
 
     def loop(self, event):
+
         current_time = time.time()
 
         # If the time of the callback is essentially the same as the control loop time
         if self.callback_time is None:
             return
-
-        # if np.round((self.callback_time - current_time), 2) != 0.0:
-        #     # print(np.round((self.callback_time - current_time), 2))
-        #     # return
-        #     pass
 
         if self.prev_pose is not None and self.prev_time is not None:
             if self.prev_pose == self.pose:

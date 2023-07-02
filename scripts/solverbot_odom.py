@@ -3,6 +3,7 @@
 import rospy
 from geometry_msgs.msg import PoseStamped, Point, Pose, Quaternion, Twist, Vector3
 from nav_msgs.msg import Odometry
+from std_msgs.msg import Bool
 from tf.transformations import euler_from_quaternion
 import time
 import csv
@@ -14,18 +15,6 @@ import numpy as np
 class OdomPublisher(object):
     def __init__(self):
         rospy.init_node('odom_publisher')
-        self.subscription = rospy.Subscriber(
-            '/vrpn_client_node/S1/pose',
-            PoseStamped,
-            self.odom_callback,
-            queue_size=10
-        )
-
-        self.odom_publisher = rospy.Publisher(
-            'solver_bot_odom', 
-            Odometry, 
-            queue_size=10)
-        
         self.odom = Odometry()
 
         self.timer = rospy.Timer(rospy.Duration(1/60), self.loop)
@@ -45,6 +34,32 @@ class OdomPublisher(object):
         self.start_time = None
         self.callback_time = None
         self.alpha = 1.0 # No filter applied id alpha = 1.0
+
+        self.btn_emergencia = False
+
+        self.subscription = rospy.Subscriber(
+            '/vrpn_client_node/S1/pose',
+            PoseStamped,
+            self.odom_callback,
+            queue_size=10
+        )
+
+        self.odom_publisher = rospy.Publisher(
+            'solver_bot_odom', 
+            Odometry, 
+            queue_size=10)
+
+        self.subscription = rospy.Subscriber(
+            'emergency_flag',
+            Bool,
+            self.emergency_button_callback,
+            queue_size=10)
+        
+
+    def emergency_button_callback(self, msg):
+        if msg.data:
+            rospy.loginfo('SolverBot Odom stopping by Emergency')
+            rospy.signal_shutdown('Emergency stop')
 
 
     def calculate_euler_diff(self, current_orientation, previous_orientation):
@@ -73,16 +88,12 @@ class OdomPublisher(object):
 
 
     def loop(self, event):
+
         current_time = time.time()
 
         # If the time of the callback is essentially the same as the control loop time
         if self.callback_time is None:
             return
-
-        # if np.round((self.callback_time - current_time), 2) != 0.0:
-        #     # print(np.round((self.callback_time - current_time), 2))
-        #     # return
-        #     pass
 
         if self.prev_pose is not None and self.prev_time is not None:
             if self.prev_pose == self.pose:

@@ -21,10 +21,6 @@ class CircularPathPublisher:
 
         self.start_time = None
 
-        self.publisher = rospy.Publisher('path_pose', Odometry, queue_size=10)
-
-        self.subscription = rospy.Subscriber('emergency_flag', Bool, self.emergency_button_callback, queue_size=10)
-
         # Create a CSV file to store the data
         folder_path = '/root/data/'
 
@@ -35,10 +31,16 @@ class CircularPathPublisher:
         self.csv_writer = csv.writer(csv_file)
         self.csv_writer.writerow(['Time', 'X', 'Y', 'VX', 'VY'])
 
-        rospy.Timer(rospy.Duration(1/self.freq), self.publish_odometry)
+        self.publisher = rospy.Publisher('path_pose', 
+                                         Odometry, 
+                                         queue_size=10)
 
-        # Initializing emergency button to False
-        self.btn_emergencia = False
+        self.subscription = rospy.Subscriber('emergency_flag', 
+                                             Bool, 
+                                             self.emergency_button_callback, 
+                                             queue_size=10)
+        
+        rospy.Timer(rospy.Duration(1/self.freq), self.publish_odometry)
 
         rospy.loginfo('Path publisher node started')
 
@@ -75,7 +77,6 @@ class CircularPathPublisher:
 
     def emergency_button_callback(self, msg):
         if msg.data:
-            self.btn_emergencia = True
             rospy.loginfo('Path publisher node stopping by Emergency')
             rospy.signal_shutdown('Emergency stop')
 
