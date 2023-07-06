@@ -132,14 +132,17 @@ class PioneerController:
         pose = msg.pose
 
         # Process the pose data
-        self.robot_x = pose.position.x
-        self.robot_y = pose.position.y
-        self.robot_z = pose.position.z
+        self.center_robot_x = pose.position.x
+        self.center_robot_y = pose.position.y
+        self.center_robot_z = pose.position.z
 
         orientation = pose.orientation
         self.robot_roll, self.robot_pitch, self.robot_yaw = tf.euler_from_quaternion(
             [orientation.x, orientation.y, orientation.z, orientation.w]
         )
+
+        self.robot_x = self.center_robot_x + self.a*np.cos(self.robot_yaw)
+        self.robot_y = self.center_robot_y + self.a*np.sin(self.robot_yaw)
 
         if self.prev_pose is not None and self.prev_time is not None:
             current_time = time.time()
@@ -157,13 +160,6 @@ class PioneerController:
             self.robot_roll_velocity = euler_diff[0] / time_diff
             self.robot_pitch_velocity = euler_diff[1] / time_diff
             self.robot_yaw_velocity = euler_diff[2] / time_diff
-            
-            #rospy.loginfo(str('Xr: ' + str(np.round(msg.pose.position.x, 3)) + ', Yr: ' + str(np.round(msg.pose.position.y, 3))))
-            #rospy.loginfo(str('Prev X: ' + str(np.round(self.prev_pose.position.x, 3)) + ', prev Y: ' + str(np.round(self.prev_pose.position.y, 3))))
-            #rospy.loginfo(str('Time diff: ' + str(np.round(time_diff, 8))))
-            
-            #rospy.loginfo(str('X dot: ' + str(np.round(self.robot_linear_x, 3)) + ', Y dot: ' + str(np.round(self.robot_linear_y, 3))))
-            #rospy.loginfo('')
 
         self.prev_pose = msg.pose
         self.prev_time = time.time()
@@ -263,17 +259,6 @@ class PioneerController:
             # Write the data to the CSV file
             self.csv_writer2.writerow([current_time.to_sec(), self.path_x, self.path_y, self.path_linear_x, self.path_linear_y])
             
-            #rospy.loginfo(str('X: ' + str(np.round(self.path_x, 3)) + ', Y: ' + str(np.round(self.path_y, 3))))
-            #rospy.loginfo(str('Prev X: ' + str(np.round(self.prev_pose_path[0], 3)) + ', prev Y: ' + str(np.round(self.prev_pose_path[1], 3))))
-            #rospy.loginfo(str('elapsed_time: ' + str(np.round(elapsed_time, 8))))
-            
-            #rospy.loginfo(str('X dot: ' + str(np.round(self.path_linear_x, 3)) + ', Y dot: ' + str(np.round(self.path_linear_y, 3))))
-            #rospy.loginfo('')
-	
-        
-        # Se não der certo
-        #self.path_linear_x = linear_velocity.x
-        #self.path_linear_y = linear_velocity.y
 
         # Não é usado
         self.path_linear_z = linear_velocity.z
@@ -334,10 +319,6 @@ class PioneerController:
 
         Xtil = np.array([self.path_x - self.robot_x, self.path_y - self.robot_y])
         
-        #rospy.loginfo(str(np.round(Xtil, 3)))
-        #if np.abs(Xtil[0]) < 0.1 and np.abs(Xtil[1]) < 0.1:
-        #    return 0.0, 0.0
-        
         if self.pioneer is None:
             rospy.loginfo('Não foi possível encontrar o Pioneer!')
             return 0.0, 0.0
@@ -354,7 +335,7 @@ class PioneerController:
                 return 0.0, 0.0
             
             # Pose do robô
-            robot_pose = [self.robot_x, self.robot_y, self.robot_yaw, self.robot_heigth, self.robot_width ]
+            robot_pose = [self.center_robot_x, self.center_robot_y, self.robot_yaw, self.robot_heigth, self.robot_width ]
 	    
 	    # Observa se existe obstáculo fixo
             if self.obstacle:

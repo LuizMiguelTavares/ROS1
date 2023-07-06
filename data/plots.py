@@ -116,7 +116,7 @@ pioneer_width = 0.6/2
 obstacle_heigth = 0.3/2
 obstacle_width = 0.3/2
 
-thetas = np.linspace(0, 2 * np.pi, 10)
+thetas = np.linspace(0, 2 * np.pi, 100)
 x_pioneer = pioneer_heigth * np.cos(thetas)
 y_pioneer = pioneer_width * np.sin(thetas)
 
@@ -159,21 +159,21 @@ def update_frame(i):
                 pioneer_odom.iloc[i]['Yd'], 
                 length_includes_head=True, head_width=0.05, color='blue')
 
-        plt.arrow(pioneer_odom.iloc[i]['X_controle'], pioneer_odom.iloc[i]['Y_controle'], 
-                desired_velocity_obs[i, 0], 
-                desired_velocity_obs[i, 1], 
-                length_includes_head=True, head_width=0.05, color='green') 
+        # plt.arrow(pioneer_odom.iloc[i]['X_controle'], pioneer_odom.iloc[i]['Y_controle'], 
+        #         desired_velocity_obs[i, 0], 
+        #         desired_velocity_obs[i, 1], 
+        #         length_includes_head=True, head_width=0.05, color='green') 
         
-        # if vobs[i, 0]>0 or vobs[i, 0]>0:
-        #     plt.arrow(pioneer_odom.iloc[i]['X_controle'], pioneer_odom.iloc[i]['Y_controle'], 
-        #         vobs[i, 0], 
-        #         vobs[i, 1], 
-        #         length_includes_head=True, head_width=0.05, color='red') 
+        if vobs[i, 0]>0 or vobs[i, 0]>0:
+            plt.arrow(pioneer_odom.iloc[i]['X_controle'], pioneer_odom.iloc[i]['Y_controle'], 
+                vobs[i, 0], 
+                vobs[i, 1], 
+                length_includes_head=True, head_width=0.05, color='red') 
             
-        #     plt.arrow(pioneer_odom.iloc[i]['X_controle'], pioneer_odom.iloc[i]['Y_controle'], 
-        #         desired_velocity[i, 0], 
-        #         desired_velocity[i, 1], 
-        #         length_includes_head=True, head_width=0.05, color='black') 
+            plt.arrow(pioneer_odom.iloc[i]['X_controle'], pioneer_odom.iloc[i]['Y_controle'], 
+                desired_velocity[i, 0], 
+                desired_velocity[i, 1], 
+                length_includes_head=True, head_width=0.05, color='green') 
 
     # Path
     path_plot_x.append(circular_path.iloc[i]['X'])
@@ -201,5 +201,5 @@ def update_frame(i):
 
 # int(len(pioneer_odom)/2)
 
-ani = FuncAnimation(fig, update_frame, frames=int(len(pioneer_odom)/2), repeat=False)
-ani.save('true_velocity_vs_desired_velocity.gif', writer='pillow', fps=fps)
+ani = FuncAnimation(fig, update_frame, frames=len(pioneer_odom), repeat=False)
+ani.save('Elipse_melhor.gif', writer='pillow', fps=fps)

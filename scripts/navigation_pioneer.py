@@ -126,17 +126,17 @@ class PioneerController:
         pose = msg.pose
 
         # Process the pose data
-        self.robot_x = pose.position.x
-        self.robot_y = pose.position.y
-        self.robot_z = pose.position.z
+        self.center_robot_x = pose.position.x
+        self.center_robot_y = pose.position.y
+        self.center_robot_z = pose.position.z
 
         orientation = pose.orientation
         self.robot_roll, self.robot_pitch, self.robot_yaw = tf.euler_from_quaternion(
             [orientation.x, orientation.y, orientation.z, orientation.w]
         )
         
-        self.robot_x = self.robot_x + self.a*np.cos(self.robot_yaw)
-        self.robot_y = self.robot_y + self.a*np.sin(self.robot_yaw)
+        self.robot_x = self.center_robot_x + self.a*np.cos(self.robot_yaw)
+        self.robot_y = self.center_robot_y + self.a*np.sin(self.robot_yaw)
 
         if self.prev_pose is not None and self.prev_time is not None:
             current_time = time.time()
@@ -195,12 +195,14 @@ class PioneerController:
 
         return euler_diff
 
+
     def normalize_angle(self, angle):
         while angle > math.pi:
             angle -= 2 * math.pi
         while angle < -math.pi:
             angle += 2 * math.pi
         return angle
+
 
     def Path(self, msg):
         pose = msg.pose.pose
@@ -230,6 +232,7 @@ class PioneerController:
         self.path_angular_x = angular_velocity.x
         self.path_angular_y = angular_velocity.y
         self.path_angular_z = angular_velocity.z
+
 
     def solver_bot_path(self, msg):
         
@@ -263,9 +266,11 @@ class PioneerController:
         self.solver_bot_angular_y = angular_velocity.y
         self.solver_bot_angular_z = angular_velocity.z
 
+
     def emergency_button_callback(self, msg):
         if msg.data:
             self.btn_emergencia = True
+
 
     def control_loop(self, event):
 
@@ -324,16 +329,8 @@ class PioneerController:
         Xtil = np.array([self.path_x - self.robot_x, self.path_y - self.robot_y]) 
         
         if self.obstacle_avoidance:
-            
-            # Segurança caso os robôs cheguem muito perto um do outro
-            # ui = np.array([self.solver_bot_x, self.solver_bot_y])
-            # ai = np.array([self.robot_x, self.robot_y])
-            # distancia = np.linalg.norm(ui - ai)
-            # if distancia <  self.robot_heigth*2:
-            #    rospy.loginfo('Deu ruim: ' + str(np.round(distancia, 3)))
-            #    return 0.0, 0.0
                 
-            robot_pose = [self.robot_x, self.robot_y, self.robot_yaw, self.robot_heigth, self.robot_width ]
+            robot_pose = [self.center_robot_x, self.center_robot_y, self.robot_yaw, self.robot_heigth, self.robot_width ]
 
             if self.obstacle:
                 obs_x_dot, obs_y_dot, pose_robot_obs, pose_obs_robot = self.obs_avoidance.obstacle_avoidance(robot_pose, self.obstacle_pose)

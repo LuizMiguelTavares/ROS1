@@ -56,6 +56,7 @@ class OdomPublisher(object):
             self.emergency_button_callback,
             queue_size=10)
     
+    
     def emergency_button_callback(self, msg):
         if msg.data:
             rospy.loginfo('Pioneer Odom stopping by Emergency')
