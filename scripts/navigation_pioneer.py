@@ -64,6 +64,7 @@ class PioneerController:
 
         # Starting Obstacle Avoidance Class
         self.obs_avoidance = ObstacleAvoidance(n=4, a=0.35, b=0.35, k=1.0)
+        # self.obs_avoidance = ObstacleAvoidance(n=4, a=0.2, b=0.2, k=0.4) # Não funciona bem
         
         # Specify the folder path where you want to create the file
         folder_path = '/root/data/'
